@@ -10,24 +10,31 @@ require 'semver'
 class GemPublisher
   def initialize
     @version = SemVer.parse(Blocktrain::VERSION)
+    @g = Git.open('.')
   end
 
   def publish
-    push_tag
+    create_tag
     create_changelog
     bump_version
+    push
   end
 
-  def push_tag
-    g = Git.open('.')
-    g.add_tag(@version.to_s)
-    g.push('origin', 'master', tags: true)
+  def create_tag
+    @g.add_tag(@version.to_s)
+    @g.push('origin', 'master', tags: true)
   end
 
   def create_changelog
     ARGV[0] = "TheODI-UD2D"
     ARGV[1] = "blocktrain"
     GitHubChangelogGenerator::ChangelogGenerator.new.run
+    @g.add 'CHANGELOG.md'
+    @g.commit 'Update changelog'
+  end
+
+  def push
+    @g.push('origin', 'master')
   end
 
   def bump_version
@@ -37,6 +44,8 @@ class GemPublisher
     renderer = ERB.new(template)
     version_file = File.open File.join('lib', 'blocktrain', 'version.rb'), 'w'
     version_file.write renderer.result(binding)
+    @g.add File.join('lib', 'blocktrain', 'version.rb')
+    @g.commit 'Bump version'
   end
 end
 
